@@ -6,5 +6,12 @@
         'dbhost' => '{{ NEXTCLOUD_DB_HOST }}',
         'dbuser' => '{{ NEXTCLOUD_DB_USER }}',
         'dbpassword' => '{{ NEXTCLOUD_DB_PASS }}',
+        'mysql.utf8mb4' => true,
+        'trusted_domains' => array (
+            0 => '{{ server_name }}',
+        ), 
+        'max_filesize' => '512G',
+        'overwriteprotocol' => 'https',
+        'overwrite.cli.url' => 'https://{{ server_name }}',
         'installed' => false,
     );
