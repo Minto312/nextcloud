@@ -1,0 +1,91 @@
+- name: Install Nextcloud on Ubuntu 24.04
+  hosts: nextcloud
+  become: true
+  tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - apache2
+          - mariadb-server
+          - php
+          - php-cli
+          - php-mysql
+          - php-xml
+          - php-mbstring
+          - php-curl
+          - php-gd
+          - php-zip
+          - unzip
+          - wget
+        state: latest
+
+    - name: Start and enable Apache and MariaDB
+      systemd:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - apache2
+        - mariadb
+
+    - name: Secure MariaDB installation
+      mysql_secure_installation:
+        login_password: ''
+        new_password: 'supersecurepassword'
+        login_user: root
+        validate_password_policy: LOW
+        remove_anonymous_users: yes
+        disallow_root_login_remotely: yes
+        remove_test_db: yes
+        state: present
+
+    - name: Create Nextcloud Database
+      mysql_db:
+        name: nextcloud
+        state: present
+
+    - name: Create Nextcloud Database User
+      mysql_user:
+        name: nextclouduser
+        password: dbpassword
+        priv: "nextcloud.*:ALL"
+        state: present
+
+    - name: Download Nextcloud
+      get_url:
+        url: https://download.nextcloud.com/server/releases/nextcloud-30.0.4.zip
+        dest: /tmp/nextcloud.zip
+
+    - name: Extract Nextcloud
+      unarchive:
+        src: /tmp/nextcloud.zip
+        dest: /var/www/html
+        remote_src: yes
+
+    - name: Set permissions for Nextcloud
+      file:
+        path: /var/www/html/nextcloud
+        state: directory
+        recurse: yes
+        owner: www-data
+        group: www-data
+
+    - name: Configure Apache for Nextcloud
+      template:
+        src: nextcloud.conf.j2
+        dest: /etc/apache2/sites-available/nextcloud.conf
+
+    - name: Enable Nextcloud Apache configuration
+      command: a2ensite nextcloud.conf
+
+    - name: Enable Apache rewrite module
+      command: a2enmod rewrite
+
+    - name: Restart Apache
+      systemd:
+        name: apache2
+        state: restarted
