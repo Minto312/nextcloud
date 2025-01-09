@@ -1,63 +1,57 @@
 - name: Install Nextcloud on Ubuntu 24.04
   hosts: nextcloud
   become: true
-  tasks:
-    - name: Update package cache
-      apt:
-        update_cache: yes
+  vars_files:
+    - .env
 
+  tasks:
     - name: Install required packages
       apt:
-        name:
-          - apache2
+        name: 
           - mariadb-server
+          - apache2
           - php
-          - php-cli
           - php-mysql
-          - php-xml
-          - php-mbstring
-          - php-curl
           - php-gd
+          - php-curl
+          - php-mbstring
+          - php-xml
           - php-zip
+          - php-intl
           - unzip
-          - wget
-        state: latest
-
-    - name: Start and enable Apache and MariaDB
-      systemd:
-        name: "{{ item }}"
-        enabled: yes
-        state: started
-      loop:
-        - apache2
-        - mariadb
-
-    - name: Secure MariaDB installation
-      mysql_secure_installation:
-        login_password: ''
-        new_password: 'supersecurepassword'
-        login_user: root
-        validate_password_policy: LOW
-        remove_anonymous_users: yes
-        disallow_root_login_remotely: yes
-        remove_test_db: yes
         state: present
+        update_cache: yes
 
-    - name: Create Nextcloud Database
-      mysql_db:
-        name: nextcloud
-        state: present
+    - name: Partition and format disk
+      filesystem:
+        fstype: ext4
+        dev: "{{ DISK_DEVICE }}"
+        force: yes
 
-    - name: Create Nextcloud Database User
-      mysql_user:
-        name: nextclouduser
-        password: dbpassword
-        priv: "nextcloud.*:ALL"
-        state: present
+    - name: Create mount point
+      file:
+        path: "{{ NEXTCLOUD_DATA_DIR }}"
+        state: directory
+
+    - name: Mount disk
+      mount:
+        path: "{{ NEXTCLOUD_DATA_DIR }}"
+        src: "{{ DISK_DEVICE }}"
+        fstype: ext4
+        opts: defaults
+        state: mounted
+
+    - name: Ensure proper permissions on data directory
+      file:
+        path: "{{ NEXTCLOUD_DATA_DIR }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: '0770'
 
     - name: Download Nextcloud
       get_url:
-        url: https://download.nextcloud.com/server/releases/nextcloud-30.0.4.zip
+        url: https://download.nextcloud.com/server/releases/latest.zip
         dest: /tmp/nextcloud.zip
 
     - name: Extract Nextcloud
@@ -70,22 +64,26 @@
       file:
         path: /var/www/html/nextcloud
         state: directory
-        recurse: yes
         owner: www-data
         group: www-data
+        recurse: yes
 
-    - name: Configure Apache for Nextcloud
-      template:
-        src: nextcloud.conf.j2
-        dest: /etc/apache2/sites-available/nextcloud.conf
-
-    - name: Enable Nextcloud Apache configuration
-      command: a2ensite nextcloud.conf
-
-    - name: Enable Apache rewrite module
-      command: a2enmod rewrite
+    - name: Configure Nextcloud data directory
+      copy:
+        dest: /var/www/html/nextcloud/config/config.php
+        content: |
+          <?php
+          $CONFIG = array (
+            'datadirectory' => '{{ NEXTCLOUD_DATA_DIR }}',
+            'dbtype' => 'mysql',
+            'dbname' => '{{ NEXTCLOUD_DB_NAME }}',
+            'dbhost' => '{{ NEXTCLOUD_DB_HOST }}',
+            'dbuser' => '{{ NEXTCLOUD_DB_USER }}',
+            'dbpassword' => '{{ NEXTCLOUD_DB_PASS }}',
+            'installed' => false,
+          );
 
     - name: Restart Apache
-      systemd:
+      service:
         name: apache2
         state: restarted
