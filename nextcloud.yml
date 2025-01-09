@@ -60,6 +60,45 @@
         group: www-data
         mode: '0770'
 
+    - name: Secure MySQL installation
+      mysql_secure_installation:
+        login_password: "{{ MYSQL_ROOT_PASS }}"
+        root_password: "{{ MYSQL_ROOT_PASS }}"
+        user_remove_anonymous: true
+        user_allow_remote_root: false
+        disallow_root_login: true
+        remove_test_db: true
+
+    - name: Create Nextcloud database
+      mysql_db:
+        name: "{{ NEXTCLOUD_DB_NAME }}"
+        state: present
+        login_user: root
+        login_password: "{{ MYSQL_ROOT_PASS }}"
+
+    - name: Create Nextcloud database user
+      mysql_user:
+        name: "{{ NEXTCLOUD_DB_USER }}"
+        password: "{{ NEXTCLOUD_DB_PASS }}"
+        priv: "{{ NEXTCLOUD_DB_NAME }}.*:ALL"
+        host: "{{ NEXTCLOUD_DB_HOST }}"
+        state: present
+        login_user: root
+        login_password: "{{ MYSQL_ROOT_PASS }}"
+
+    - name: Set MySQL to listen on all interfaces
+      lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: '^bind-address'
+        line: 'bind-address = 0.0.0.0'
+        state: present
+      notify: Restart MySQL
+
+    - name: Restart MySQL
+      service:
+        name: mariadb
+        state: restarted
+
     - name: Download Nextcloud
       get_url:
         url: https://download.nextcloud.com/server/releases/latest.zip
