@@ -19,6 +19,7 @@
           - php-zip
           - php-intl
           - unzip
+          - python3-mysql.connector
         state: present
         update_cache: yes
 
@@ -59,6 +60,16 @@
         owner: www-data
         group: www-data
         mode: '0770'
+
+    - name: Create a virtual environment
+      command: python3 -m venv /opt/ansible_venv
+
+    - name: Install MySQL Python library in virtual environment
+      command: /opt/ansible_venv/bin/pip install mysqlclient PyMySQL
+
+    - name: Set Python MySQL module
+      set_fact:
+        ansible_python_interpreter: /opt/ansible_venv/bin/python
 
     - name: Set MySQL root password
       mysql_user:
