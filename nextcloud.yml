@@ -94,6 +94,21 @@
             'installed' => false,
           );
 
+    - name: Deploy Apache Virtual Host configuration for Nextcloud
+      template:
+        src: apache.conf.j2
+        dest: /etc/apache2/sites-available/nextcloud.conf
+      notify: Restart Apache
+
+    - name: Enable Nextcloud site
+      command: a2ensite nextcloud.conf
+      notify: Restart Apache
+
+    - name: Disable default Apache site
+      command: a2dissite 000-default.conf
+      notify: Restart Apache
+
+  handlers:
     - name: Restart Apache
       service:
         name: apache2
